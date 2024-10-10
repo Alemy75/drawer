@@ -5,7 +5,7 @@ WORKDIR app/
 COPY requirements.txt requirements.txt
 
 RUN pip3 install --upgrade pip setuptools wheel
-RUN pip3 install --timeout=60 -r requirements.txt
+RUN pip3 install --timeout=100 --verbose -r requirements.txt
 
 COPY . .
 
