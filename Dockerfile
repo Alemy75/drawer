@@ -9,4 +9,4 @@ COPY requirements.txt requirements.txt
 
 COPY . .
 
-CMD ["python3", "main.py", "-a", "1"]
+CMD ["./venv/bin/python3", "main.py", "-a", "1"]
