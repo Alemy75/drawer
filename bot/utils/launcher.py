@@ -26,7 +26,9 @@ start_text = """
 My other bots:
 
 💩Boinkers - https://github.com/YarmolenkoD/boinkers
-🚀Moonbix - https://github.com/YarmolenkoD/moonbix
+🚀Moonbix - https://github.com/YarmolenkoD/moonbix [GAME IS NOT WORKING]
+
+NEW ENV VARIABLE: ENABLE_EXPERIMENTAL_X3_MODE=True (Default = True)
 
 Select an action:
 
@@ -48,9 +50,12 @@ def get_session_names() -> list[str]:
 
 
 def get_proxies() -> list[Proxy]:
-    if settings.USE_PROXY_FROM_FILE:
+    condition = True
+    
+    if condition:
         with open(file="bot/config/proxies.txt", encoding="utf-8-sig") as file:
             proxies = [Proxy.from_str(proxy=row.strip()).as_url for row in file]
+
     else:
         proxies = []
 

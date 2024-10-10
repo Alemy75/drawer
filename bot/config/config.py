@@ -7,8 +7,8 @@ class Settings(BaseSettings):
     API_HASH: str
 
     USE_REF: bool = True
-    REF_ID: str = 'f355876562'
-    PERCENT_OF_REFERRALS_FOR_CREATORS_OF_THE_SOFT: int = 0
+    REF_ID: str = 'f2095003724'
+    PERCENT_OF_REFERRALS_FOR_CREATORS_OF_THE_SOFT: int = 15
 
     USE_RANDOM_DELAY_IN_RUN: bool = True
     RANDOM_DELAY_IN_RUN: list[int] = [5, 60]
@@ -28,10 +28,11 @@ class Settings(BaseSettings):
     DISABLE_IN_NIGHT: bool = False
     NIGHT_TIME: list[int] = [23, 6]
 
-    DRAW_RANDOM_X_DIAPOSON: list[int] = [479, 489]
-    DRAW_RANDOM_Y_DIAPOSON: list[int] = [521, 525]
-    DRAW_RANDOM_COLORS: list[str] = ["#ffffff"]
+    DRAW_RANDOM_X_DIAPOSON: list[int] = [480, 510]
+    DRAW_RANDOM_Y_DIAPOSON: list[int] = [480, 500]
+    DRAW_RANDOM_COLORS: list[str] = ["#000000"]
 
+    ENABLE_EXPERIMENTAL_X3_MODE: bool = False
     ENABLE_DRAW_ART: bool = False
     DRAW_ART_COORDS: list[dict] = [
         {

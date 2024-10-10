@@ -4,6 +4,8 @@ from time import time
 from urllib.parse import unquote, quote
 import re
 from copy import deepcopy
+from PIL import Image
+import io
 
 from json import dump as dp, loads as ld
 from aiocfscrape import CloudflareScraper
@@ -14,6 +16,7 @@ from pyrogram.errors import Unauthorized, UserDeactivated, AuthKeyUnregistered, 
 from pyrogram.raw.functions.messages import RequestAppWebView
 from pyrogram.raw import types
 
+import websockets
 import asyncio
 import random
 import string
@@ -50,6 +53,9 @@ class Tapper:
         self.game_service_is_unavailable = False
         self.already_joined_squad_channel = None
         self.user = None
+        self.updated_pixels = {}
+        self.socket = None
+        self.socket_task = None
 
         self.session_ug_dict = self.load_user_agents() or []
 
@@ -329,6 +335,20 @@ class Tapper:
             self.error(f"Unknown error during get user info: <light-yellow>{err}</light-yellow>")
             return None
 
+    async def get_status(self, http_client: aiohttp.ClientSession):
+        try:
+            response = await http_client.get('https://notpx.app/api/v1/mining/status', ssl=settings.ENABLE_SSL)
+
+            response.raise_for_status()
+
+            data = await response.json()
+
+            return data
+        except Exception as error:
+            self.error(f"Unknown error during processing status: <light-yellow>{error}</light-yellow>")
+            await asyncio.sleep(delay=3)
+            return None
+
     async def get_balance(self, http_client: aiohttp.ClientSession):
         try:
             response = await http_client.get('https://notpx.app/api/v1/mining/status', ssl=settings.ENABLE_SSL)
@@ -342,6 +362,119 @@ class Tapper:
             self.error(f"Unknown error during processing balance: <light-yellow>{error}</light-yellow>")
             await asyncio.sleep(delay=3)
             return None
+
+    async def get_image(self, http_client, url, image_headers):
+        try:
+            async with http_client.get(url, headers=image_headers) as response:
+                if response.status == 200:
+                    img_data = await response.read()
+                    img = Image.open(io.BytesIO(img_data))
+                    return img
+                else:
+                    raise Exception(f"Failed to download image from {url}, status: {response.status}")
+        except Exception as error:
+            self.error(f"Error during loading image from url: {url} | Error: {error}")
+            return None
+
+    async def send_draw_request(self, http_client: aiohttp.ClientSession, update):
+        x, y, color = update
+
+        pixelId = int(f'{y}{x}')+1
+
+        payload = {
+            "pixelId": pixelId,
+            "newColor": color
+        }
+
+        draw_request = await http_client.post(
+            'https://notpx.app/api/v1/repaint/start',
+            json=payload,
+            ssl=settings.ENABLE_SSL
+        )
+
+        draw_request.raise_for_status()
+
+        data = await draw_request.json()
+
+        self.success(f"Painted (X: <cyan>{x}</cyan>, Y: <cyan>{y}</cyan>) with color <light-blue>{color}</light-blue> 🎨️ | Balance <light-green>{'{:,.3f}'.format(data.get('balance', 'unknown'))}</light-green> 🔳")
+
+    async def draw_x3(self, http_client: aiohttp.ClientSession):
+        try:
+            response = await http_client.get('https://notpx.app/api/v1/mining/status', ssl=settings.ENABLE_SSL)
+
+            response.raise_for_status()
+
+            data = await response.json()
+
+            charges = data['charges']
+
+            if charges > 0:
+                self.info(f"Energy: <cyan>{charges}</cyan> ⚡️")
+            else:
+                self.info(f"No energy ⚡️")
+                return None
+
+            image_url = 'https://app.notpx.app/assets/durovoriginal-CqJYkgok.png'
+
+            x_offset = 244 # initial Y coords of world template image
+            y_offset = 244 # initial Y coords of world template image
+
+            image_headers = deepcopy(headers)
+            image_headers['Host'] = 'app.notpx.app'
+            image = await self.get_image(http_client, image_url, image_headers=image_headers)
+
+            if not image:
+                return None
+
+            subscribe_message = json.dumps({
+                "action": "subscribe",
+                "channel": "imageUpdates"
+            })
+
+            await self.socket.send_str(subscribe_message)
+
+            while charges > 0:
+                await asyncio.sleep(delay=random.randint(4, 8))
+
+                break_socket = False
+
+                async for message in self.socket:
+                    if break_socket:
+                        break
+
+                    if message.type == aiohttp.WSMsgType.TEXT:
+                        try:
+                            updates = message.data.split("\n")
+
+                            for update in updates:
+                                match = re.match(r'pixelUpdate:(\d+):#([0-9A-Fa-f]{6})', update)
+
+                                if match:
+                                    pixel_index = match.group(1)
+
+                                    if len(pixel_index) < 6:
+                                        continue
+
+                                    updated_y = int(str(pixel_index)[:3])
+                                    updated_x = int(str(pixel_index)[3:]) - 1
+                                    updated_pixel_color = f"#{match.group(2)}"
+
+                                    if updated_x > 244 and updated_x < 755 and updated_y > 244 and updated_y < 755:
+                                       image_pixel = image.getpixel((updated_x - x_offset, updated_y - y_offset))
+                                       image_hex_color = '#{:02x}{:02x}{:02x}'.format(*image_pixel)
+
+                                       if image_hex_color.upper() != updated_pixel_color.upper():
+                                           await self.send_draw_request(http_client=http_client, update=(updated_x, updated_y, image_hex_color.upper()))
+                                           charges = charges - 1
+                                           break_socket = True
+                                           break
+                        except Exception as e:
+                            self.error(f"Websocket error during painting (x3): {e}")
+        except Exception as error:
+            self.warning(f"Unknown error during painting (x3): <light-yellow>{error}</light-yellow>")
+            self.info(f"Start drawing without x3...")
+            await asyncio.sleep(delay=3)
+            await self.draw(http_client=http_client)
 
     async def draw(self, http_client: aiohttp.ClientSession):
         try:
@@ -358,7 +491,8 @@ class Tapper:
             else:
                 self.info(f"No energy ⚡️")
 
-            for _ in range(charges):
+            index = 0
+            while index < charges:
                 if settings.ENABLE_DRAW_ART:
                     curr = random.choice(settings.DRAW_ART_COORDS)
 
@@ -379,34 +513,24 @@ class Tapper:
                     y = random.randint(settings.DRAW_RANDOM_Y_DIAPOSON[0], settings.DRAW_RANDOM_Y_DIAPOSON[1])
 
                     color = random.choice(settings.DRAW_RANDOM_COLORS)
-
-                pixId = int(f"{y}{x}")+1
-
+                    
                 # Получение инфы по пикселю
+                pixId = int(f"{y}{x}")+1
                 pixel_info_request = await http_client.get(f'https://notpx.app/api/v1/image/get/{pixId}', ssl=settings.ENABLE_SSL)            
                 pixel_data = await pixel_info_request.json()
                 pixel_color = pixel_data['pixel']['color']
                 blocked_colors = ['#000000']
-           
                 if (pixel_color in blocked_colors):
                     pixel_info_request.raise_for_status()
                     self.success("Pixel has block color. Going next")
-                    
                     continue
                 else:
-                    payload = {
-                        "pixelId": pixId,
-                        "newColor": color
-                    }
-                    draw_request = await http_client.post(
-                        'https://notpx.app/api/v1/repaint/start',
-                        json=payload,
-                        ssl=settings.ENABLE_SSL
-                    )
-                    draw_request.raise_for_status()
-                    self.success(f"Painted (X: <cyan>{x}</cyan>, Y: <cyan>{y}</cyan>) with color <light-blue>{color}</light-blue> 🎨️")  
-                    await asyncio.sleep(delay=random.randint(5, 10))   
+                    index += 1
+                    
+                    await self.send_draw_request(http_client=http_client, update=(x, y, color))
+                    await asyncio.sleep(delay=random.randint(5, 10))  
 
+               
         except Exception as error:
             self.error(f"Unknown error during painting: <light-yellow>{error}</light-yellow>")
             await asyncio.sleep(delay=3)
@@ -632,6 +756,22 @@ class Tapper:
 
             await asyncio.sleep(delay=3)
 
+    async def create_socket_connection(self, http_client: aiohttp.ClientSession):
+        uri = "wss://notpx.app/api/v2/image/ws"
+
+        try:
+            socket = await http_client.ws_connect(uri)
+
+            self.socket = socket
+
+            self.info("WebSocket connected successfully")
+
+            return socket
+
+        except Exception as e:
+            self.error(f"WebSocket connection error: {e}")
+            return None
+
     async def run(self, proxy: str | None) -> None:
         if settings.USE_RANDOM_DELAY_IN_RUN:
             random_delay = random.randint(settings.RANDOM_DELAY_IN_RUN[0], settings.RANDOM_DELAY_IN_RUN[1])
@@ -688,6 +828,9 @@ class Tapper:
                 await asyncio.sleep(delay=2)
 
                 if user is not None:
+                    if settings.ENABLE_EXPERIMENTAL_X3_MODE:
+                        self.socket = await self.create_socket_connection(http_client=http_client)
+
                     self.user = user
                     current_balance = await self.get_balance(http_client=http_client)
                     repaints = user['repaints']
@@ -702,7 +845,10 @@ class Tapper:
                         await self.join_squad(http_client=http_client, user=user)
 
                     if settings.ENABLE_AUTO_DRAW:
-                        await self.draw(http_client=http_client)
+                        if settings.ENABLE_EXPERIMENTAL_X3_MODE and self.socket:
+                            await self.draw_x3(http_client=http_client)
+                        else:
+                            await self.draw(http_client=http_client)
 
                     if settings.ENABLE_AUTO_UPGRADE:
                         status = await self.upgrade(http_client=http_client)
@@ -719,8 +865,6 @@ class Tapper:
 
                 sleep_time = random.randint(settings.SLEEP_TIME_IN_MINUTES[0], settings.SLEEP_TIME_IN_MINUTES[1])
 
-                self.info(f"sleep {sleep_time} minutes between cycles 💤")
-
                 is_night = False
 
                 if settings.DISABLE_IN_NIGHT:
@@ -728,6 +872,18 @@ class Tapper:
 
                 if is_night:
                     sleep_time = self.time_until_morning()
+
+                if is_night:
+                    self.info(f"sleep {int(sleep_time)} minutes to the morning ({settings.NIGHT_TIME[1]} hours) 💤")
+                else:
+                    self.info(f"sleep {int(sleep_time)} minutes between cycles 💤")
+
+                if self.socket != None:
+                    try:
+                        await self.socket.close()
+                        self.info(f"WebSocket closed successfully")
+                    except Exception as error:
+                        self.error(f"Unknown error during closing socket: <light-yellow>{error}</light-yellow>")
 
                 await asyncio.sleep(delay=sleep_time*60)
 
