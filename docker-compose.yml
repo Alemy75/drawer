@@ -1,8 +1,14 @@
 services:
   bot:
-    container_name: 'drawer-bot'
+    container_name: "drawer-bot"
     build:
       context: .
     command: "python3 main.py -a 1"
     volumes:
       - .:/app
+    networks:
+      - default
+
+networks:
+  default:
+    driver: bridge
