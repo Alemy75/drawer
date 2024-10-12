@@ -519,8 +519,7 @@ class Tapper:
                 pixel_info_request = await http_client.get(f'https://notpx.app/api/v1/image/get/{pixId}', ssl=settings.ENABLE_SSL)            
                 pixel_data = await pixel_info_request.json()
                 pixel_color = pixel_data['pixel']['color']
-                blocked_colors = ['#000000']
-                if (pixel_color in blocked_colors):
+                if (pixel_color == color):
                     pixel_info_request.raise_for_status()
                     self.success("Pixel has block color. Going next")
                     continue
