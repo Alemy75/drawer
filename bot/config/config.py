@@ -17,6 +17,7 @@ class Settings(BaseSettings):
 
     ENABLE_AUTO_TASKS: bool = True
     ENABLE_AUTO_DRAW: bool = True
+    ENABLE_JOIN_TG_CHANNELS: bool = False
     UNSAFE_ENABLE_JOIN_TG_CHANNELS: bool = False
     ENABLE_CLAIM_REWARD: bool = True
     ENABLE_AUTO_UPGRADE: bool = True
