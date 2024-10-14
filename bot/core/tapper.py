@@ -424,6 +424,17 @@ class Tapper:
 
         self.success(f"Painted (X: <cyan>{x}</cyan>, Y: <cyan>{y}</cyan>) with color <light-blue>{color}</light-blue> 🎨️ | Balance <light-green>{'{:,.3f}'.format(self.current_user_balance)}</light-green> <magenta>(+{added_points} pix)</magenta> 🔳")
 
+    async def get_pixel_color(self, http_client: aiohttp.ClientSession, pixel_id):
+        try: 
+            pixel_info_request = await http_client.get(f'https://notpx.app/api/v1/image/get/{pixel_id}', ssl=settings.ENABLE_SSL)         
+               
+            pixel_data = await pixel_info_request.json()
+            
+            return pixel_data['pixel']['color']
+    
+        except Exception as e:
+             return None
+
     def check_timeout_error(self, error):
          try:
              error_message = str(error)
@@ -493,8 +504,15 @@ class Tapper:
                                     image_pixel = self.image_template.getpixel((updated_x - x_offset, updated_y - y_offset))
                                     image_hex_color = '#{:02x}{:02x}{:02x}'.format(*image_pixel)
 
-                                    if image_hex_color.upper() != updated_pixel_color.upper():
+                                    if image_hex_color.upper() != updated_pixel_color.upper():                                       
                                         charges = charges - 1
+                                        
+                                        pixel_id = int(f'{updated_y}{updated_x}')+1
+                                        
+                                        pixel_prev_color = await self.get_pixel_color(http_client=http_client, pixel_id=pixel_id)
+                                        
+                                        self.info(f"Previous color {pixel_prev_color}, New color {image_hex_color.upper()}")
+                                        
                                         await self.send_draw_request(http_client=http_client, update=(updated_x, updated_y, image_hex_color.upper()))
                                         tries = 2
                                         break
