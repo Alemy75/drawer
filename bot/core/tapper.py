@@ -519,16 +519,18 @@ class Tapper:
                 pixel_info_request = await http_client.get(f'https://notpx.app/api/v1/image/get/{pixId}', ssl=settings.ENABLE_SSL)            
                 pixel_data = await pixel_info_request.json()
                 pixel_color = pixel_data['pixel']['color']
-                if (pixel_color != color):
-                    pixel_info_request.raise_for_status()
-                    self.success("Pixel has block color. Going next")
-                    continue
-                else:
-                    index += 1
+                # if (pixel_color != color):
+                #     pixel_info_request.raise_for_status()
+                #     self.success("Pixel has block color. Going next")
+                #     continue
+                # else:
+                #     index += 1
                     
-                    await self.send_draw_request(http_client=http_client, update=(x, y, pixel_color))
-                    await asyncio.sleep(delay=random.randint(5, 10))  
-
+                #     await self.send_draw_request(http_client=http_client, update=(x, y, pixel_color))
+                #     await asyncio.sleep(delay=random.randint(5, 10))  
+                index += 1
+                await self.send_draw_request(http_client=http_client, update=(x, y, pixel_color))
+                await asyncio.sleep(delay=random.randint(5, 10))  
                
         except Exception as error:
             self.error(f"Unknown error during painting: <light-yellow>{error}</light-yellow>")
