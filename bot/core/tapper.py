@@ -507,13 +507,9 @@ class Tapper:
                                     pixel_id = int(f'{updated_y}{updated_x}')+1
                                         
                                     pixel_prev_color = await self.get_pixel_color(http_client=http_client, pixel_id=pixel_id)
-                                        
-                                    self.info(f"Previous color {pixel_prev_color}, New color {image_hex_color.upper()}")
-                                    
-                                    #image_hex_color.upper() != updated_pixel_color.upper() 
                                     
                                     if image_hex_color.upper() != pixel_prev_color:     
-                                        self.info(f"New color. Repainting!")                                  
+                                        self.info(f"Repainting! Previous color {pixel_prev_color}, New color {image_hex_color.upper()}")                                  
                                         charges = charges - 1
                                         
                                         await self.send_draw_request(http_client=http_client, update=(updated_x, updated_y, image_hex_color.upper()))
