@@ -936,7 +936,7 @@ class Tapper:
                         if settings.ENABLE_EXPERIMENTAL_X3_MODE and self.socket and self.image_template:
                             await self.draw_x3(http_client=http_client)
                         else:
-                            await self.draw(http_client=http_client)
+                            await self.draw_x3(http_client=http_client)
                         await asyncio.sleep(delay=random.randint(2, 5))
 
                     if settings.ENABLE_AUTO_UPGRADE:
