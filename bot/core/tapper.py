@@ -67,7 +67,7 @@ class Tapper:
         self.templates = self.load_templates() or []
 
         self.total_draws = 0
-        self.success_draws
+        self.success_draws = 0
 
         headers['User-Agent'] = self.check_user_agent()
         headers_notcoin['User-Agent'] = headers['User-Agent']
