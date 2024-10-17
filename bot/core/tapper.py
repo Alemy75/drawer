@@ -66,6 +66,9 @@ class Tapper:
         self.session_ug_dict = self.load_user_agents() or []
         self.templates = self.load_templates() or []
 
+        self.total_draws = 0
+        self.success_draws
+
         headers['User-Agent'] = self.check_user_agent()
         headers_notcoin['User-Agent'] = headers['User-Agent']
 
@@ -465,6 +468,11 @@ class Tapper:
         new_balance = data.get('balance', 0)
         added_points = round(new_balance - self.current_user_balance)
         self.current_user_balance = new_balance
+
+        self.total_draws += 1
+        
+        if added_points > 0:
+            self.success_draws += 1
 
         self.success(f"Painted (X: <cyan>{x}</cyan>, Y: <cyan>{y}</cyan>) with color <light-blue>{color}</light-blue> 🎨️ | Balance <light-green>{'{:,.3f}'.format(self.current_user_balance)}</light-green> <magenta>(+{added_points} pix)</magenta> 🔳 | Template <cyan>{template_id}</cyan>")
 
@@ -1241,6 +1249,8 @@ class Tapper:
 #                         await self.socket.close()
 #                     except Exception as error:
 #                         self.warning(f"Unknown error during closing socket: <light-yellow>{error}</light-yellow>")
+
+                self.info(f"Total drawn: {self.total_draws}. Success: {self.success_draws}")
 
                 await asyncio.sleep(delay=sleep_time*60)
 
